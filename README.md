@@ -1,6 +1,8 @@
 
 ```markdown
 # Modern Bubble Shooter 🎯
+Demo
+https://modern-bubble-shooter-game.vercel.app/
 
 [![Demo Preview](https://modern-bubble-shooter-game.vercel.app/)
 
