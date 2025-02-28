@@ -97,5 +97,3 @@ For maximum impact:
 3. Add social media badges
 4. Consider adding an achievements section
 5. Include system requirements if needed
-
-Would you like me to modify any particular section or add additional information?
