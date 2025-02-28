@@ -1,10 +1,8 @@
 
-```markdown
-# Modern Bubble Shooter 🎯
-Demo
-https://modern-bubble-shooter-game.vercel.app/
 
-[![Demo Preview](https://modern-bubble-shooter-game.vercel.app/)
+# Modern Bubble Shooter 🎯
+
+![Demo Preview](https://modern-bubble-shooter-game.vercel.app/)
 
 A modern twist on the classic bubble shooter game featuring advanced physics, dynamic visual effects, and strategic gameplay mechanics. Built with pure JavaScript and HTML5 Canvas.
 
