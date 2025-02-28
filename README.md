@@ -2,12 +2,12 @@
 ```markdown
 # Modern Bubble Shooter 🎯
 
-[![Demo Preview](https://img.shields.io/badge/demo-link-blue)](https://your-demo-link.com) 
-![License](https://img.shields.io/badge/license-MIT-green)
+[![Demo Preview](https://modern-bubble-shooter-game.vercel.app/)
 
 A modern twist on the classic bubble shooter game featuring advanced physics, dynamic visual effects, and strategic gameplay mechanics. Built with pure JavaScript and HTML5 Canvas.
 
-![Gameplay Preview](screenshot.png) <!-- Add actual screenshot -->
+![Gameplay Preview](https://github.com/user-attachments/assets/d8342344-99df-4519-88a0-6d8edc6e0eab)
+
 
 ## Features ✨
 
