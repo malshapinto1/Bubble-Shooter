@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bubble Shooter</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Arial', sans-serif;
+            background-color: transparent;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        
+        #game-container {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0, 0, 255, 0.3);
+        }
+        
+        #game-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+        
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        
+        #score-display {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.7);
+        }
+        
+        #level-display {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 0 0 5px rgba(0, 0, 0, 0.7);
+        }
+        
+        #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+        }
+        
+        #game-over.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
+        #game-over h1 {
+            color: white;
+            font-size: 40px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        #game-over p {
+            color: white;
+            font-size: 24px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        #restart-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 18px;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            outline: none;
+        }
+        
+        #restart-btn:hover {
+            background: #3e8e41;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        <div id="ui-layer">
+            <div id="score-display">Score: 0</div>
+            <div id="level-display">Level: 1</div>
+        </div>
+        <div id="game-over">
+            <h1>Game Over</h1>
+            <p>Your Score: <span id="final-score">0</span></p>
+            <button id="restart-btn">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        class BubbleShooter {
+            constructor() {
+                this.container = document.getElementById('game-container');
+                this.canvas = document.getElementById('game-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.scoreDisplay = document.getElementById('score-display');
+                this.levelDisplay = document.getElementById('level-display');
+                this.gameOverPanel = document.getElementById('game-over');
+                this.finalScoreDisplay = document.getElementById('final-score');
+                this.restartBtn = document.getElementById('restart-btn');
+                
+                // Game settings
+                this.bubbleRadius = 20;
+                this.gridRows = 8;
+                this.gridCols = 10;
+                this.colors = ['#FF5252', '#FFEB3B', '#4CAF50', '#2196F3', '#9C27B0'];
+                this.score = 0;
+                this.level = 1;
+                
+                // Game state
+                this.grid = [];
+                this.currentBubble = null;
+                this.nextBubble = null;
+                this.shooterAngle = -Math.PI / 2; // Default angle (straight up)
+                this.gameActive = true;
+                
+                // Initialize the game
+                this.init();
+            }
+            
+            init() {
+                // Set canvas dimensions
+                this.canvas.width = this.container.clientWidth;
+                this.canvas.height = this.container.clientHeight;
+                
+                // Initialize grid
+                this.initializeGrid();
+                
+                // Create first bubble
+                this.createCurrentBubble();
+                this.createNextBubble();
+                
+                // Set up event listeners
+                this.setupEventListeners();
+                
+                // Start game loop
+                this.gameLoop();
+            }
+            
+            initializeGrid() {
+                this.grid = [];
+                
+                // Only initialize the top few rows
+                const initialRows = Math.min(3, this.gridRows);
+                
+                for (let row = 0; row < initialRows; row++) {
+                    this.grid[row] = [];
+                    for (let col = 0; col < this.gridCols; col++) {
+                        // Determine if this position should have a bubble (for a scattered look)
+                        if (Math.random() < 0.8) { // 80% chance to have a bubble
+                            const colorIndex = Math.floor(Math.random() * this.colors.length);
+                            const xOffset = (row % 2 === 0) ? 0 : this.bubbleRadius;
+                            
+                            this.grid[row][col] = {
+                                x: col * this.bubbleRadius * 2 + this.bubbleRadius + xOffset,
+                                y: row * this.bubbleRadius * 1.8 + this.bubbleRadius,
+                                color: this.colors[colorIndex],
+                                row: row,
+                                col: col
+                            };
+                        } else {
+                            this.grid[row][col] = null;
+                        }
+                    }
+                }
+                
+                // Initialize remaining rows as empty
+                for (let row = initialRows; row < this.gridRows; row++) {
+                    this.grid[row] = Array(this.gridCols).fill(null);
+                }
+            }
+            
+            createCurrentBubble() {
+                const colorIndex = Math.floor(Math.random() * this.colors.length);
+                this.currentBubble = {
+                    x: this.canvas.width / 2,
+                    y: this.canvas.height - this.bubbleRadius * 2,
+                    color: this.colors[colorIndex],
+                    vx: 0,
+                    vy: 0,
+                    moving: false
+                };
+            }
+            
+            createNextBubble() {
+                const colorIndex = Math.floor(Math.random() * this.colors.length);
+                this.nextBubble = {
+                    color: this.colors[colorIndex]
+                };
+            }
+            
+            setupEventListeners() {
+                // Mouse move to aim
+                this.canvas.addEventListener('mousemove', (e) => {
+                    if (!this.gameActive) return;
+                    
+                    const rect = this.canvas.getBoundingClientRect();
+                    const mouseX = e.clientX - rect.left;
+                    const mouseY = e.clientY - rect.top;
+                    
+                    // Calculate angle between shooter position and mouse position
+                    const dx = mouseX - this.currentBubble.x;
+                    const dy = mouseY - this.currentBubble.y;
+                    this.shooterAngle = Math.atan2(dy, dx);
+                    
+                    // Limit angle to upward direction only (between -PI and 0)
+                    if (this.shooterAngle > 0 && this.shooterAngle <= Math.PI / 2) {
+                        this.shooterAngle = 0;
+                    } else if (this.shooterAngle > Math.PI / 2 && this.shooterAngle <= Math.PI) {
+                        this.shooterAngle = Math.PI;
+                    }
+                });
+                
+                // Click to shoot
+                this.canvas.addEventListener('click', () => {
+                    if (!this.gameActive || this.currentBubble.moving) return;
+                    
+                    // Set bubble velocity based on angle
+                    const speed = 12;
+                    this.currentBubble.vx = Math.cos(this.shooterAngle) * speed;
+                    this.currentBubble.vy = Math.sin(this.shooterAngle) * speed;
+                    this.currentBubble.moving = true;
+                });
+                
+                // Restart button
+                this.restartBtn.addEventListener('click', () => {
+                    this.restartGame();
+                });
+                
+                // Handle window resize
+                window.addEventListener('resize', () => {
+                    this.canvas.width = this.container.clientWidth;
+                    this.canvas.height = this.container.clientHeight;
+                });
+            }
+            
+            gameLoop() {
+                if (this.gameActive) {
+                    this.update();
+                    this.render();
+                }
+                
+                requestAnimationFrame(() => this.gameLoop());
+            }
+            
+            update() {
+                if (this.currentBubble.moving) {
+                    // Update bubble position
+                    this.currentBubble.x += this.currentBubble.vx;
+                    this.currentBubble.y += this.currentBubble.vy;
+                    
+                    // Bounce off walls
+                    if (this.currentBubble.x - this.bubbleRadius < 0 || 
+                        this.currentBubble.x + this.bubbleRadius > this.canvas.width) {
+                        this.currentBubble.vx *= -1;
+                        
+                        // Add slight random variation to prevent infinite bounces
+                        this.currentBubble.vy += (Math.random() - 0.5) * 0.2;
+                    }
+                    
+                    // Check for ceiling collision
+                    if (this.currentBubble.y - this.bubbleRadius < 0) {
+                        this.snapBubbleToGrid();
+                        return;
+                    }
+                    
+                    // Check for collision with other bubbles
+                    for (let row = 0; row < this.grid.length; row++) {
+                        for (let col = 0; col < this.grid[row].length; col++) {
+                            const bubble = this.grid[row][col];
+                            if (bubble) {
+                                const dx = this.currentBubble.x - bubble.x;
+                                const dy = this.currentBubble.y - bubble.y;
+                                const distance = Math.sqrt(dx * dx + dy * dy);
+                                
+                                if (distance < this.bubbleRadius * 2) {
+                                    this.snapBubbleToGrid();
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            snapBubbleToGrid() {
+                // Find the closest grid position
+                let closestRow = 0;
+                let closestCol = 0;
+                let closestDistance = Infinity;
+                
+                for (let row = 0; row < this.grid.length; row++) {
+                    for (let col = 0; col < this.grid[row].length; col++) {
+                        if (this.grid[row][col] === null) {
+                            const xOffset = (row % 2 === 0) ? 0 : this.bubbleRadius;
+                            const gridX = col * this.bubbleRadius * 2 + this.bubbleRadius + xOffset;
+                            const gridY = row * this.bubbleRadius * 1.8 + this.bubbleRadius;
+                            
+                            const dx = this.currentBubble.x - gridX;
+                            const dy = this.currentBubble.y - gridY;
+                            const distance = Math.sqrt(dx * dx + dy * dy);
+                            
+                            if (distance < closestDistance) {
+                                closestDistance = distance;
+                                closestRow = row;
+                                closestCol = col;
+                            }
+                        }
+                    }
+                }
+                
+                // Check if a valid position was found
+                if (closestDistance < this.bubbleRadius * 3) {
+                    const xOffset = (closestRow % 2 === 0) ? 0 : this.bubbleRadius;
+                    const gridX = closestCol * this.bubbleRadius * 2 + this.bubbleRadius + xOffset;
+                    const gridY = closestRow * this.bubbleRadius * 1.8 + this.bubbleRadius;
+                    
+                    // Add bubble to grid
+                    this.grid[closestRow][closestCol] = {
+                        x: gridX,
+                        y: gridY,
+                        color: this.currentBubble.color,
+                        row: closestRow,
+                        col: closestCol
+                    };
+                    
+                    // Check for matches
+                    this.checkMatches(closestRow, closestCol);
+                    
+                    // Check if game is over (bubbles too low)
+                    this.checkGameOver();
+                    
+                    // Create new bubble
+                    this.currentBubble = {
+                        x: this.canvas.width / 2,
+                        y: this.canvas.height - this.bubbleRadius * 2,
+                        color: this.nextBubble.color,
+                        vx: 0,
+                        vy: 0,
+                        moving: false
+                    };
+                    
+                    this.createNextBubble();
+                } else {
+                    // If no valid position, just create a new bubble
+                    this.currentBubble = {
+                        x: this.canvas.width / 2,
+                        y: this.canvas.height - this.bubbleRadius * 2,
+                        color: this.nextBubble.color,
+                        vx: 0,
+                        vy: 0,
+                        moving: false
+                    };
+                    
+                    this.createNextBubble();
+                }
+            }
+            
+            checkMatches(row, col) {
+                const visited = Array(this.gridRows).fill().map(() => Array(this.gridCols).fill(false));
+                const matches = [];
+                const targetColor = this.grid[row][col].color;
+                
+                // Find all connected bubbles of the same color
+                const findMatches = (r, c) => {
+                    if (r < 0 || r >= this.gridRows || c < 0 || c >= this.gridCols || 
+                        visited[r][c] || !this.grid[r][c] || this.grid[r][c].color !== targetColor) {
+                        return;
+                    }
+                    
+                    visited[r][c] = true;
+                    matches.push({ row: r, col: c });
+                    
+                    // Check neighbors (handle odd/even row offset for hexagonal grid)
+                    const directions = [
+                        { r: -1, c: -1 }, { r: -1, c: 0 }, { r: -1, c: 1 },
+                        { r: 0, c: -1 }, { r: 0, c: 1 },
+                        { r: 1, c: -1 }, { r: 1, c: 0 }, { r: 1, c: 1 }
+                    ];
+                    
+                    for (const dir of directions) {
+                        let newRow = r + dir.r;
+                        let newCol = c + dir.c;
+                        
+                        // Adjust for hexagonal grid (offset in odd rows)
+                        if (r % 2 === 1 && (dir.r === -1 || dir.r === 1) && dir.c === -1) {
+                            continue;
+                        }
+                        if (r % 2 === 0 && (dir.r === -1 || dir.r === 1) && dir.c === 1) {
+                            continue;
+                        }
+                        
+                        findMatches(newRow, newCol);
+                    }
+                };
+                
+                findMatches(row, col);
+                
+                // If 3 or more matches, remove them and update score
+                if (matches.length >= 3) {
+                    for (const match of matches) {
+                        this.grid[match.row][match.col] = null;
+                    }
+                    
+                    this.score += matches.length * 10;
+                    this.scoreDisplay.textContent = `Score: ${this.score}`;
+                    
+                    // Check for floating bubbles (not connected to top)
+                    this.removeFloatingBubbles();
+                    
+                    // Level up if score threshold reached
+                    if (this.score >= this.level * 500) {
+                        this.levelUp();
+                    }
+                }
+            }
+            
+            removeFloatingBubbles() {
+                // Mark all bubbles connected to the top row
+                const visited = Array(this.gridRows).fill().map(() => Array(this.gridCols).fill(false));
+                
+                // Start from the top row
+                for (let col = 0; col < this.gridCols; col++) {
+                    if (this.grid[0][col]) {
+                        this.markConnected(0, col, visited);
+                    }
+                }
+                
+                // Remove all unmarked bubbles (floating)
+                let floatingCount = 0;
+                for (let row = 0; row < this.gridRows; row++) {
+                    for (let col = 0; col < this.gridCols; col++) {
+                        if (this.grid[row][col] && !visited[row][col]) {
+                            this.grid[row][col] = null;
+                            floatingCount++;
+                        }
+                    }
+                }
+                
+                // Award points for floating bubbles
+                if (floatingCount > 0) {
+                    this.score += floatingCount * 15;
+                    this.scoreDisplay.textContent = `Score: ${this.score}`;
+                }
+            }
+            
+            markConnected(row, col, visited) {
+                if (row < 0 || row >= this.gridRows || col < 0 || col >= this.gridCols || 
+                    visited[row][col] || !this.grid[row][col]) {
+                    return;
+                }
+                
+                visited[row][col] = true;
+                
+                // Check neighbors (handle odd/even row offset for hexagonal grid)
+                const directions = [
+                    { r: -1, c: -1 }, { r: -1, c: 0 }, { r: -1, c: 1 },
+                    { r: 0, c: -1 }, { r: 0, c: 1 },
+                    { r: 1, c: -1 }, { r: 1, c: 0 }, { r: 1, c: 1 }
+                ];
+                
+                for (const dir of directions) {
+                    let newRow = row + dir.r;
+                    let newCol = col + dir.c;
+                    
+                    // Adjust for hexagonal grid (offset in odd rows)
+                    if (row % 2 === 1 && (dir.r === -1 || dir.r === 1) && dir.c === -1) {
+                        continue;
+                    }
+                    if (row % 2 === 0 && (dir.r === -1 || dir.r === 1) && dir.c === 1) {
+                        continue;
+                    }
+                    
+                    this.markConnected(newRow, newCol, visited);
+                }
+            }
+            
+            levelUp() {
+                this.level++;
+                this.levelDisplay.textContent = `Level: ${this.level}`;
+                
+                // Add a new row of bubbles from the top
+                for (let row = this.gridRows - 1; row > 0; row--) {
+                    this.grid[row] = [...this.grid[row - 1]];
+                    
+                    // Update row/col properties
+                    for (let col = 0; col < this.gridCols; col++) {
+                        if (this.grid[row][col]) {
+                            this.grid[row][col] = {
+                                ...this.grid[row][col],
+                                row: row,
+                                col: col
+                            };
+                        }
+                    }
+                }
+                
+                // Create new top row
+                this.grid[0] = [];
+                for (let col = 0; col < this.gridCols; col++) {
+                    if (Math.random() < 0.7) { // 70% chance for a bubble
+                        const colorIndex = Math.floor(Math.random() * this.colors.length);
+                        const xOffset = 0; // Top row is always even
+                        
+                        this.grid[0][col] = {
+                            x: col * this.bubbleRadius * 2 + this.bubbleRadius + xOffset,
+                            y: this.bubbleRadius,
+                            color: this.colors[colorIndex],
+                            row: 0,
+                            col: col
+                        };
+                    } else {
+                        this.grid[0][col] = null;
+                    }
+                }
+                
+                // Check if game is over
+                this.checkGameOver();
+            }
+            
+            checkGameOver() {
+                // Game over if any bubble reaches the bottom or nears the shooter
+                const threshold = this.canvas.height - this.bubbleRadius * 4;
+                
+                for (let row = 0; row < this.gridRows; row++) {
+                    for (let col = 0; col < this.gridCols; col++) {
+                        if (this.grid[row][col] && this.grid[row][col].y > threshold) {
+                            this.endGame();
+                            return;
+                        }
+                    }
+                }
+            }
+            
+            endGame() {
+                this.gameActive = false;
+                this.finalScoreDisplay.textContent = this.score;
+                this.gameOverPanel.classList.add('active');
+            }
+            
+            restartGame() {
+                this.score = 0;
+                this.level = 1;
+                this.scoreDisplay.textContent = `Score: ${this.score}`;
+                this.levelDisplay.textContent = `Level: ${this.level}`;
+                this.gameActive = true;
+                this.gameOverPanel.classList.remove('active');
+                this.initializeGrid();
+                this.createCurrentBubble();
+                this.createNextBubble();
+            }
+            
+            render() {
+                // Clear canvas
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Draw grid bubbles
+                for (let row = 0; row < this.grid.length; row++) {
+                    for (let col = 0; col < this.grid[row].length; col++) {
+                        const bubble = this.grid[row][col];
+                        if (bubble) {
+                            this.drawBubble(bubble.x, bubble.y, bubble.color);
+                        }
+                    }
+                }
+                
+                // Draw shooter base
+                this.ctx.fillStyle = '#333';
+                this.ctx.beginPath();
+                this.ctx.arc(this.canvas.width / 2, this.canvas.height, 30, Math.PI, 2 * Math.PI);
+                this.ctx.fill();
+                
+                // Draw aim line
+                if (!this.currentBubble.moving) {
+                    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+                    this.ctx.lineWidth = 2;
+                    this.ctx.setLineDash([5, 5]);
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(this.currentBubble.x, this.currentBubble.y);
+                    
+                    // Calculate end point based on angle
+                    const lineLength = 200;
+                    const endX = this.currentBubble.x + Math.cos(this.shooterAngle) * lineLength;
+                    const endY = this.currentBubble.y + Math.sin(this.shooterAngle) * lineLength;
+                    
+                    this.ctx.lineTo(endX, endY);
+                    this.ctx.stroke();
+                    this.ctx.setLineDash([]);
+                }
+                
+                // Draw current bubble
+                this.drawBubble(this.currentBubble.x, this.currentBubble.y, this.currentBubble.color);
+                
+                // Draw next bubble (small preview)
+                this.ctx.fillStyle = this.nextBubble.color;
+                this.ctx.beginPath();
+                this.ctx.arc(this.canvas.width / 2 + 40, this.canvas.height - 20, this.bubbleRadius * 0.7, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                // Draw glassy overlay to add modern look
+                this.drawGlassEffect();
+            }
+            
+            drawBubble(x, y, color) {
+                // Main bubble
+                this.ctx.fillStyle = color;
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, this.bubbleRadius, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                // Highlight (creates 3D effect)
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                this.ctx.beginPath();
+                this.ctx.arc(x - this.bubbleRadius * 0.3, y - this.bubbleRadius * 0.3, this.bubbleRadius * 0.4, 0, Math.PI * 2);
+                this.ctx.fill();
+                
+                // Outline
+                this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.2)';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.arc(x, y, this.bubbleRadius, 0, Math.PI * 2);
+                this.ctx.stroke();
+            }
+            
+            drawGlassEffect() {
+                // Top gradient
+                const gradientTop = this.ctx.createLinearGradient(0, 0, 0, 100);
+                gradientTop.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+                gradientTop.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                
+                this.ctx.fillStyle = gradientTop;
+                this.ctx.fillRect(0, 0, this.canvas.width, 100);
+                
+                // Bottom shadow
+                const gradientBottom = this.ctx.createLinearGradient(0, this.canvas.height - 50, 0, this.canvas.height);
+                gradientBottom.addColorStop(0, 'rgba(0, 0, 0, 0)');
+                gradientBottom.addColorStop(1, 'rgba(0, 0, 0, 0.3)');
+                
+                this.ctx.fillStyle = gradientBottom;
+                this.ctx.fillRect(0, this.canvas.height - 50, this.canvas.width, 50);
+            }
+        }
+        
+        // Initialize game when the page loads
+        window.addEventListener('load', () => {
+            const game = new BubbleShooter();
+        });
+    </script>
+</body>
+</html>
