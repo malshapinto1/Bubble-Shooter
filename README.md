@@ -2,7 +2,7 @@
 
 # Modern Bubble Shooter 🎯
 
-![](https://modern-bubble-shooter-game.vercel.app/)
+- **Live Demo**: [Play Now](https://modern-bubble-shooter-game.vercel.app/)
 
 A modern twist on the classic bubble shooter game featuring advanced physics, dynamic visual effects, and strategic gameplay mechanics. Built with pure JavaScript and HTML5 Canvas.
 
